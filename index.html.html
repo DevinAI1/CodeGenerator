@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>12-Digit Code Manager</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1f1f1f, #2b2b2b);
+      color: #eee;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 30px 10px;
+    }
+    h1 {
+      margin: 20px;
+      font-size: 2em;
+      text-align: center;
+    }
+    .card {
+      background: #292929;
+      padding: 25px;
+      border-radius: 15px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      margin: 15px;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    input, button {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      text-align: center;
+    }
+    input {
+      background: #3a3a3a;
+      color: #00ff00;
+    }
+    button {
+      background-color: #444;
+      color: white;
+      transition: 0.3s;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #666;
+    }
+    .green {
+      background-color: #4CAF50;
+    }
+    .green:hover {
+      background-color: #45a049;
+    }
+    .blue {
+      background-color: #008CBA;
+    }
+    .blue:hover {
+      background-color: #007bb5;
+    }
+    .orange {
+      background-color: #ff9800;
+    }
+    .orange:hover {
+      background-color: #e68900;
+    }
+    #expireTime {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #fca311;
+    }
+    #overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      display: none;
+      z-index: 999;
+    }
+    #popup {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(40,40,40,0.95);
+      padding: 30px;
+      border-radius: 15px;
+      backdrop-filter: blur(8px);
+      display: none;
+      z-index: 1000;
+      min-width: 300px;
+      text-align: center;
+      color: #eee;
+      box-shadow: 0 0 20px rgba(0,0,0,0.7);
+    }
+    #popup.success {
+      border: 2px solid #4CAF50;
+    }
+    #popup.error {
+      border: 2px solid #f44336;
+    }
+    #popup.warning {
+      border: 2px solid #ff9800;
+    }
+    #popup h2 {
+      margin-bottom: 10px;
+    }
+    #popup p {
+      white-space: pre-line;
+    }
+    #popup button {
+      background: #555;
+      margin-top: 15px;
+      color: white;
+    }
+    #popup button:hover {
+      background: #777;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🔑 12-Digit Code Manager</h1>
+
+<div class="card">
+  <input type="text" id="generatedCode" placeholder="Generated Code" readonly>
+  <button class="green" onclick="generateCode()">Generate Code</button>
+  <button class="blue" onclick="activateCode()">Activate Code</button>
+  <div id="expireTime"></div>
+</div>
+
+<div class="card">
+  <input type="text" id="checkCode" placeholder="Enter Code to Check">
+  <button class="orange" onclick="checkCode()">Check Code</button>
+</div>
+
+<div id="overlay"></div>
+<div id="popup">
+  <h2 id="popupTitle"></h2>
+  <p id="popupMessage"></p>
+  <button onclick="closePopup()">OK</button>
+</div>
+
+<script>
+let code = "";
+let codeCreationTime = null;
+let savedCodes = JSON.parse(localStorage.getItem('savedCodes') || '{}');
+
+function generateCode() {
+    code = "";
+    const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    for (let i = 0; i < 12; i++) {
+        code += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    codeCreationTime = Date.now();
+    document.getElementById("generatedCode").value = code;
+    document.getElementById("expireTime").innerText = "";
+}
+
+function activateCode() {
+    if (!code) {
+        showPopup("Error", "No code generated!", "error");
+        return;
+    }
+    if (Date.now() > codeCreationTime + 5 * 60 * 60 * 1000) {
+        showPopup("Error", "Code has expired!", "error");
+        return;
+    }
+
+    let username = prompt("Enter a username for this activation:");
+    if (!username) {
+        showPopup("Error", "Activation cancelled.", "error");
+        return;
+    }
+
+    savedCodes[code] = {
+        username: username,
+        time: codeCreationTime
+    };
+    localStorage.setItem('savedCodes', JSON.stringify(savedCodes));
+
+    navigator.clipboard.writeText(code);
+
+    let expireDate = new Date(codeCreationTime + 5 * 60 * 60 * 1000);
+    let expireTime = expireDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+    document.getElementById("expireTime").innerText = "Expires at: " + expireTime;
+
+    showPopup("Success", `Activated for ${username}!\n(Copied to clipboard)`, "success");
+}
+
+function checkCode() {
+    let entered = document.getElementById("checkCode").value.trim().toUpperCase();
+    if (!entered) {
+        showPopup("Error", "Please enter a code.", "error");
+        return;
+    }
+
+    if (!savedCodes[entered]) {
+        showPopup("Status - Not Found", "Code not found in system.", "warning");
+        return;
+    }
+
+    let data = savedCodes[entered];
+    if (Date.now() > data.time + 5 * 60 * 60 * 1000) {
+        showPopup("Status - Expired", `Code expired.\nUser: ${data.username}`, "error");
+    } else {
+        let expireDate = new Date(data.time + 5 * 60 * 60 * 1000);
+        let expireTime = expireDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+        showPopup("Status - Active", `Code is active!\nUser: ${data.username}\nExpires at: ${expireTime}`, "success");
+    }
+}
+
+function showPopup(title, message, type) {
+    const popup = document.getElementById("popup");
+    document.getElementById("popupTitle").innerText = title;
+    document.getElementById("popupMessage").innerText = message;
+
+    popup.className = "";
+    if (type === "success") {
+        popup.classList.add("success");
+    } else if (type === "error") {
+        popup.classList.add("error");
+    } else if (type === "warning") {
+        popup.classList.add("warning");
+    }
+
+    document.getElementById("overlay").style.display = "block";
+    popup.style.display = "block";
+}
+
+function closePopup() {
+    document.getElementById("popup").style.display = "none";
+    document.getElementById("overlay").style.display = "none";
+}
+</script>
+
+</body>
+</html>
